@@ -14,6 +14,9 @@ import breeze.linalg._
 
 object StreamingTests {
   def main(args: Array[String]) {
+
+    // add comment for testing github
+
     val conf = new SparkConf().setAppName("Spark CluStream").setMaster("local[*]")
     //    val conf = new SparkConf().setAppName("Stream Word Count").setMaster("spark://192.168.0.119:7077")
     val sc = new SparkContext(conf)
