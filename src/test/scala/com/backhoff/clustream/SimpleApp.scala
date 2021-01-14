@@ -26,17 +26,17 @@ object SimpleApp {
 //    println("Lines with a: %s, Lines with b: %s".format(numAs, numBs))
 
     val h = 1
-    val t1 = 6
-    val t2 = 21
-    val t3 = 81
-    val t4 = 161
-
+    val t1 = 5
+    val t2 = 20
+    val t3 = 80
+    val t4 = 160
+val dir="src/test/resources/snaps"
 //    Tools.convertMCsBinariesToText("snaps", "snaps/text", 100)
     val clustream = new CluStream(null)
-    val snap1 = timer{clustream.getMCsFromSnapshots("snaps",t1,h)}
-    val snap2 = timer{clustream.getMCsFromSnapshots("snaps",t2,h)}
-    val snap3 = timer{clustream.getMCsFromSnapshots("snaps",t3,h)}
-    val snap4 = timer{clustream.getMCsFromSnapshots("snaps",t4,h)}
+    val snap1 = timer{clustream.getMCsFromSnapshots(dir,t1,h)}
+    val snap2 = timer{clustream.getMCsFromSnapshots(dir,t2,h)}
+    val snap3 = timer{clustream.getMCsFromSnapshots(dir,t3,h)}
+    val snap4 = timer{clustream.getMCsFromSnapshots(dir,t4,h)}
 
     println(snap1.map(a => a.getN).mkString("[",",","]"))
     println("mics points = " + snap1.map(_.getN).sum)
@@ -50,30 +50,30 @@ object SimpleApp {
     val clusters1 = timer{clustream.fakeKMeans(sc,5,5000,snap1)}
     if(clusters1 != null) {
       println("MacroClusters Ceneters")
-      println("snapshots " + clustream.getSnapShots("snaps",t1,h))
+      println("snapshots " + clustream.getSnapShots(dir,t1,h))
       clusters1.clusterCenters.foreach(println)
-      clusters1.clusterCenters.foreach(c=>scala.tools.nsc.io.Path("/home/omar/datasets/tests/1case/results/clustream2000/centers1").createFile().appendAll(c.toArray.mkString("",",","") +"\n" ))
+      clusters1.clusterCenters.foreach(c=>scala.tools.nsc.io.Path("src/test/resources/clustream2000/centers5").createFile().appendAll(c.toArray.mkString("",",","") +"\n" ))
     }
     val clusters2 = timer{clustream.fakeKMeans(sc,5,5000,snap2)}
     if(clusters2 != null) {
       println("MacroClusters Ceneters")
-      println("snapshots " + clustream.getSnapShots("snaps",t2,h))
+      println("snapshots " + clustream.getSnapShots(dir,t2,h))
       clusters2.clusterCenters.foreach(println)
-      clusters2.clusterCenters.foreach(c=>scala.tools.nsc.io.Path("/home/omar/datasets/tests/1case/results/clustream2000/centers2").createFile().appendAll(c.toArray.mkString("",",","") +"\n" ))
+      clusters2.clusterCenters.foreach(c=>scala.tools.nsc.io.Path("src/test/resources/clustream2000/centers20").createFile().appendAll(c.toArray.mkString("",",","") +"\n" ))
     }
     val clusters3 = timer{clustream.fakeKMeans(sc,5,5000,snap3)}
     if(clusters3 != null) {
       println("MacroClusters Ceneters")
-      println("snapshots " + clustream.getSnapShots("snaps",t3,h))
+      println("snapshots " + clustream.getSnapShots(dir,t3,h))
       clusters3.clusterCenters.foreach(println)
-      clusters3.clusterCenters.foreach(c=>scala.tools.nsc.io.Path("/home/omar/datasets/tests/1case/results/clustream2000/centers3").createFile().appendAll(c.toArray.mkString("",",","") +"\n" ))
+      clusters3.clusterCenters.foreach(c=>scala.tools.nsc.io.Path("src/test/resources/clustream2000/centers80").createFile().appendAll(c.toArray.mkString("",",","") +"\n" ))
     }
     val clusters4 = timer{clustream.fakeKMeans(sc,5,5000,snap4)}
     if(clusters4 != null) {
       println("MacroClusters Ceneters")
-      println("snapshots " + clustream.getSnapShots("snaps",t4,h))
+      println("snapshots " + clustream.getSnapShots(dir,t4,h))
       clusters4.clusterCenters.foreach(println)
-      clusters4.clusterCenters.foreach(c=>scala.tools.nsc.io.Path("/home/omar/datasets/tests/1case/results/clustream2000/centers4").createFile().appendAll(c.toArray.mkString("",",","") +"\n" ))
+      clusters4.clusterCenters.foreach(c=>scala.tools.nsc.io.Path("src/test/resources/clustream2000/centers160").createFile().appendAll(c.toArray.mkString("",",","") +"\n" ))
     }
 
 

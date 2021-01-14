@@ -5,12 +5,15 @@ package com.backhoff.clustream
  */
 
 import breeze.linalg._
-import org.apache.spark.{SparkContext, Logging}
+import org.apache.spark.{Logging, SparkContext}
 import org.apache.spark.streaming.dstream.DStream
 import org.apache.spark.annotation.Experimental
+
 import java.io._
-import java.nio.file.{Paths, Files}
+import java.nio.file.{Files, Paths}
 import org.apache.spark.mllib.clustering.KMeans
+
+import scala.util.Try
 
 /**
   * Class that contains the offline methods for the CluStream
@@ -66,6 +69,7 @@ class CluStream (
     var delete = false
     var order = 0
     val mcs = model.getMicroClusters
+    val mcSW = model.getMicroClusterSW
 
 
     val exp = (scala.math.log(tc) / scala.math.log(alpha)).toInt
@@ -83,15 +87,21 @@ class CluStream (
 
       if (write) {
         val out = new ObjectOutputStream(new FileOutputStream(dir + "/" + tc))
+        val out1 = new ObjectOutputStream((new FileOutputStream(dir + "/" + tc + "SW")))
 
         try {
           out.writeObject(mcs)
+          out1.writeObject(mcSW)
+         // println(mcs.map(x=>x.getN).mkString(","))
+
         }
         catch {
           case ex: IOException => println("Exception while writing file " + ex)
         }
         finally {
           out.close()
+          out1.close()
+
         }
       }
 
@@ -189,6 +199,20 @@ class CluStream (
     mcs.filter(_.getN > 0).map(mc => mc.getCf1x :/ mc.getN.toDouble)
     }
 
+  def getMCsFromSnapshotSW(dir: String = "", tc: Long): Array[MicroCluster] = {
+    try {
+      val in1 = new ObjectInputStream(new FileInputStream(dir + "/" + tc))
+      val snap1 = in1.readObject().asInstanceOf[Array[MicroCluster]]
+      in1.close()
+      snap1
+    } catch {
+      case ex: IOException => println("Exception while reading files " + ex)
+        null
+    }
+
+  }
+
+
   /**
     * Method that returns the weights of the microclusters from the number of points.
     *
@@ -201,7 +225,30 @@ class CluStream (
     val sum: Double = arr.sum
     arr.map(value => value/sum)
   }
-
+  /**
+   * expiring phase
+   * DELETE file with related swFiles
+   *
+   * @param tc
+   * @param windowTime
+   * @param dir
+   * */
+  def expiringPhase(tc: Long, windowTime: Int, dir: String) = {
+    val threshold = tc - windowTime
+    val directory = new File(dir)
+    try {
+      if (directory.exists && directory.isDirectory) {
+        val expireFiles = directory.listFiles().filter(x => Try(x.getName.toInt).isSuccess && x.getName.toInt < threshold).head
+        expireFiles.delete()
+        val swFile = dir + "/" + expireFiles.getName + "SW"
+        if (Files.exists(Paths.get(swFile))) {
+          Files.delete(Paths.get(swFile))
+        }
+      }
+    } catch {
+      case ex: IOException => println("Exception files not found or not delete! " + ex)
+    }
+  }
   /**
     * Method that returns a computed KMeansModel. It runs a modified version
     * of the KMeans algorithm in Spark from sampling the microclusters given
