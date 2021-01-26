@@ -19,8 +19,6 @@ object OnlineCenters {
     val snapshot= clustream.getMCsFromSnapshotSW(snaps, tc)
    // println("mics points = " + snapshot.map(_.getN).sum)
     var centers = clustream.getCentersFromMC(snapshot).map(v => org.apache.spark.mllib.linalg.Vectors.dense(v.toArray))
-    centers.foreach(c => scala.tools.nsc.io.Path(s"src/test/resources/clustream2000/centers${tc}").createFile().appendAll(c.toArray.mkString("", ",", "") + "\n"))
-
-
+    centers.foreach(c => scala.tools.nsc.io.Path(s"${Setting.centersOnlinePath}/centers${tc}").createFile().appendAll(c.toArray.mkString("", ",", "") + "\n"))
   }
 }
