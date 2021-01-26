@@ -4,7 +4,10 @@ import java.io._
 import java.nio.file.{Paths, Files}
 
 object Tools {
+  def main(args: Array[String]): Unit = {
+    convertMCsBinariesToText("src/test/resources/snaps","src/test/resources/snapPrint",291)
 
+  }
     def convertMCsBinariesToText(dirIn: String = "", dirOut: String = "", limit: Int): Unit = {
       print("processing files: ")
       for(i <- 0 to limit) {
@@ -39,6 +42,5 @@ object Tools {
       }
       println()
     }
-
 }
 

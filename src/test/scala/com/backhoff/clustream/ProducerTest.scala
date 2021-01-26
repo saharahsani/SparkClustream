@@ -47,11 +47,12 @@ object ProducerTest extends  App() {
   val fileName4="src/test/resources/powersupply.csv"
   val fileName5="src/test/resources/ShuffleDataset.csv"
   val fileName6="src/test/resources/scaledCovtype.csv"
+  val fileName7="src/test/resources/Covtype.csv"
 
 
   try {
     var i = 0
-    for (line <- Source.fromFile(fileName).getLines) {
+    for (line <- Source.fromFile(fileName7).getLines) {
       {
         i += 1
         val message = line + "\n"
