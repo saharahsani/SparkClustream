@@ -1,8 +1,8 @@
 package com.backhoff.clustream
 
 /**
- * Created by omar on 9/25/15.
- */
+  * Created by omar on 9/25/15.
+  */
 
 import breeze.linalg._
 import org.apache.spark.{Logging, SparkContext}
@@ -21,23 +21,23 @@ import scala.util.Try
   * facilitate the use of it at the same time the online process
   * is running.
   *
-  **/
+  * */
 
 @Experimental
-class CluStream (
-                  val model:CluStreamOnline)
-  extends Logging with Serializable{
+class CluStream(
+                 val model: CluStreamOnline)
+  extends Logging with Serializable {
 
   def this() = this(null)
 
   /**
     * Method that samples values from a given distribution.
     *
-    * @param dist: this is a map containing values and their weights in
-    *            the distributions. Weights must add to 1.
-    *            Example. {A -> 0.5, B -> 0.3, C -> 0.2 }
+    * @param dist : this is a map containing values and their weights in
+    *             the distributions. Weights must add to 1.
+    *             Example. {A -> 0.5, B -> 0.3, C -> 0.2 }
     * @return A: sample value A
-    **/
+    * */
 
   private def sample[A](dist: Map[A, Double]): A = {
     val p = scala.util.Random.nextDouble
@@ -56,14 +56,13 @@ class CluStream (
     * Method that saves a snapshot to disk using the pyramidal time
     * scheme to a given directory.
     *
-    * @param dir: directory to save the snapshot
+    * @param dir   : directory to save the snapshot
+    * @param tc    : time clock unit to save
+    * @param alpha : alpha parameter of the pyramidal time scheme
+    * @param l     : l modifier of the pyramidal time scheme
+    * */
 
-    * @param tc: time clock unit to save
-    * @param alpha: alpha parameter of the pyramidal time scheme
-    * @param l: l modifier of the pyramidal time scheme
-    **/
-
-  def saveSnapShotsToDisk(dir: String = "", tc: Long, alpha: Int = 2, l: Int = 2): Unit ={
+  def saveSnapShotsToDisk(dir: String = "", tc: Long, alpha: Int = 2, l: Int = 2): Unit = {
 
     var write = false
     var delete = false
@@ -74,67 +73,66 @@ class CluStream (
 
     val exp = (scala.math.log(tc) / scala.math.log(alpha)).toInt
 
-      for (i <- 0 to exp) {
-        if (tc % scala.math.pow(alpha, i + 1) != 0 && tc % scala.math.pow(alpha, i) == 0) {
-          order = i
-          write = true
-        }
+    for (i <- 0 to exp) {
+      if (tc % scala.math.pow(alpha, i + 1) != 0 && tc % scala.math.pow(alpha, i) == 0) {
+        order = i
+        write = true
       }
+    }
 
-      val tcBye = tc - ((scala.math.pow(alpha, l) + 1) * scala.math.pow(alpha, order + 1)).toInt
+    val tcBye = tc - ((scala.math.pow(alpha, l) + 1) * scala.math.pow(alpha, order + 1)).toInt
 
-      if (tcBye > 0) delete = true
+    if (tcBye > 0) delete = true
 
-      if (write) {
-        val out = new ObjectOutputStream(new FileOutputStream(dir + "/" + tc))
-        val out1 = new ObjectOutputStream((new FileOutputStream(dir + "/" + tc + "SW")))
+    if (write) {
+      val out = new ObjectOutputStream(new FileOutputStream(dir + "/" + tc))
+      val out1 = new ObjectOutputStream((new FileOutputStream(dir + "/" + tc + "SW")))
 
-        try {
-          out.writeObject(mcs)
-          out1.writeObject(mcSW)
-         // println(mcs.map(x=>x.getN).mkString(","))
+      try {
+        out.writeObject(mcs)
+        out1.writeObject(mcSW)
+        // println(mcs.map(x=>x.getN).mkString(","))
 
-        }
-        catch {
-          case ex: IOException => println("Exception while writing file " + ex)
-        }
-        finally {
-          out.close()
-          out1.close()
-
-        }
       }
-
-      if (delete) {
-        try {
-          new File(dir + "/" + tcBye).delete()
-        }
-        catch {
-          case ex: IOException => println("Exception while deleting file " + ex);
-        }
+      catch {
+        case ex: IOException => println("Exception while writing file " + ex)
       }
+      finally {
+        out.close()
+        out1.close()
+
+      }
+    }
+
+    if (delete) {
+      try {
+        new File(dir + "/" + tcBye).delete()
+      }
+      catch {
+        case ex: IOException => println("Exception while deleting file " + ex);
+      }
+    }
   }
 
   /**
     * Method that gets the snapshots to use for a given time and horizon in a
     * given file directory.
     *
-    * @param dir: directory to save the snapshot
-
-    * @param tc: time clock unit to save
-    * @param h: time horizon
+    * @param dir : directory to save the snapshot
+    * @param tc  : time clock unit to save
+    * @param h   : time horizon
     * @return (Long,Long): tuple of the first and second snapshots to use.
-    **/
+    * */
 
-  def getSnapShots(dir: String = "", tc: Long, h: Long): (Long,Long) = {
+  def getSnapShots(dir: String = "", tc: Long, h: Long): (Long, Long) = {
 
     var tcReal = tc
-    while(!Files.exists(Paths.get(dir + "/" + tcReal)) && tcReal >= 0) tcReal = tcReal - 1
+    while (!Files.exists(Paths.get(dir + "/" + tcReal)) && tcReal >= 0) tcReal = tcReal - 1
     var tcH = tcReal - h
-    while(!Files.exists(Paths.get(dir + "/" + tcH)) && tcH >= 0) tcH = tcH - 1
-    if(tcH < 0) while(!Files.exists(Paths.get(dir + "/" + tcH))) tcH = tcH + 1
+    while (!Files.exists(Paths.get(dir + "/" + tcH)) && tcH >= 0) tcH = tcH - 1
+    if (tcH < 0) while (!Files.exists(Paths.get(dir + "/" + tcH))) tcH = tcH + 1
 
-    if(tcReal == -1L) tcH = -1L
+    if (tcReal == -1L) tcH = -1L
     (tcReal, tcH)
   }
 
@@ -142,17 +140,16 @@ class CluStream (
     * Method that returns the microclusters from the snapshots for a given time and horizon in a
     * given file directory. Subtracts the features of the first one with the second one.
     *
-    * @param dir: directory to save the snapshot
-
-    * @param tc: time clock unit to save
-    * @param h: time horizon
+    * @param dir : directory to save the snapshot
+    * @param tc  : time clock unit to save
+    * @param h   : time horizon
     * @return Array[MicroCluster]: computed array of microclusters
-    **/
+    * */
 
   def getMCsFromSnapshots(dir: String = "", tc: Long, h: Long): Array[MicroCluster] = {
-    val (t1,t2) = getSnapShots(dir,tc,h)
+    val (t1, t2) = getSnapShots(dir, tc, h)
 
-    try{
+    try {
       val in1 = new ObjectInputStream(new FileInputStream(dir + "/" + t1))
       val snap1 = in1.readObject().asInstanceOf[Array[MicroCluster]]
 
@@ -165,10 +162,10 @@ class CluStream (
       val arrs1 = snap1.map(_.getIds)
       val arrs2 = snap2.map(_.getIds)
 
-      val relatingMCs = snap1 zip arrs1.map(a => arrs2.zipWithIndex.map(b=> if(b._1.toSet.intersect(a.toSet).nonEmpty) b._2;else -1))
-      relatingMCs.map{ mc =>
-        if (!mc._2.forall(_ == -1) && t1 - h  >= t2) {
-          for(id <- mc._2) if(id != -1) {
+      val relatingMCs = snap1 zip arrs1.map(a => arrs2.zipWithIndex.map(b => if (b._1.toSet.intersect(a.toSet).nonEmpty) b._2; else -1))
+      relatingMCs.map { mc =>
+        if (!mc._2.forall(_ == -1) && t1 - h >= t2) {
+          for (id <- mc._2) if (id != -1) {
             mc._1.setCf2x(mc._1.getCf2x :- snap2(id).getCf2x)
             mc._1.setCf1x(mc._1.getCf1x :- snap2(id).getCf1x)
             mc._1.setCf2t(mc._1.getCf2t - snap2(id).getCf2t)
@@ -177,13 +174,13 @@ class CluStream (
             mc._1.setIds(mc._1.getIds.toSet.diff(snap2(id).getIds.toSet).toArray)
           }
           mc._1
-        }else mc._1
+        } else mc._1
 
       }
     }
-    catch{
+    catch {
       case ex: IOException => println("Exception while reading files " + ex)
-      null
+        null
     }
 
   }
@@ -191,13 +188,13 @@ class CluStream (
   /**
     * Method that returns the centrois of the microclusters.
     *
-    * @param mcs: array of microclusters
+    * @param mcs : array of microclusters
     * @return Array[Vector]: computed array of centroids
-    **/
+    * */
 
   def getCentersFromMC(mcs: Array[MicroCluster]): Array[Vector[Double]] = {
     mcs.filter(_.getN > 0).map(mc => mc.getCf1x :/ mc.getN.toDouble)
-    }
+  }
 
   def getMCsFromSnapshotSW(dir: String = "", tc: Long): Array[MicroCluster] = {
     try {
@@ -216,77 +213,84 @@ class CluStream (
   /**
     * Method that returns the weights of the microclusters from the number of points.
     *
-    * @param mcs: array of microclusters
+    * @param mcs : array of microclusters
     * @return Array[Double]: computed array of weights
-    **/
+    * */
 
   def getWeightsFromMC(mcs: Array[MicroCluster]): Array[Double] = {
     var arr: Array[Double] = mcs.map(_.getN.toDouble).filter(_ > 0)
     val sum: Double = arr.sum
-    arr.map(value => value/sum)
+    arr.map(value => value / sum)
   }
+
   /**
-   * expiring phase
-   * DELETE file with related swFiles
-   *
-   * @param tc
-   * @param windowTime
-   * @param dir
-   * */
-  def expiringPhase(tc: Long, windowTime: Int, dir: String) = {
+    * expiring phase
+    * DELETE file with related swFiles
+    *
+    * @param tc
+    * @param windowTime
+    * @param dir
+    * */
+  def expiringPhase(tc: Long, windowTime: Int, dir: String): Boolean = {
     val threshold = tc - windowTime
     val directory = new File(dir)
     try {
-      if (directory.exists && directory.isDirectory) {
-        val expireFiles = directory.listFiles().filter(x => Try(x.getName.toInt).isSuccess && x.getName.toInt < threshold).head
-        expireFiles.delete()
-        val swFile = dir + "/" + expireFiles.getName + "SW"
-        if (Files.exists(Paths.get(swFile))) {
-          Files.delete(Paths.get(swFile))
+      if (directory.exists && directory.isDirectory && directory.listFiles().length > 0) {
+        val expiredFiles = directory.listFiles().filter(x => Try(x.getName.toInt).isSuccess && x.getName.toInt < threshold)
+        if (expiredFiles.length > 0) {
+          val headFile = expiredFiles.head
+          headFile.delete()
+          val swFile = dir + "/" + headFile.getName + "SW"
+          if (Files.exists(Paths.get(swFile))) {
+            Files.delete(Paths.get(swFile))
+          }
+          return true
         }
       }
     } catch {
       case ex: IOException => println("Exception files not found or not delete! " + ex)
     }
+    return false
   }
+
   /**
     * Method that returns a computed KMeansModel. It runs a modified version
     * of the KMeans algorithm in Spark from sampling the microclusters given
     * its weights.
     *
-    * @param sc: spark context where KMeans will run
-    * @param k: number of clusters
-    * @param mcs: array of microclusters
+    * @param sc  : spark context where KMeans will run
+    * @param k   : number of clusters
+    * @param mcs : array of microclusters
     * @return org.apache.spark.mllib.clustering.KMeansModel: computed KMeansModel
-    **/
+    * */
 
-  def fakeKMeans(sc: SparkContext,k: Int, numPoints: Int, mcs: Array[MicroCluster]): org.apache.spark.mllib.clustering.KMeansModel ={
+  def fakeKMeans(sc: SparkContext, k: Int, numPoints: Int, mcs: Array[MicroCluster]): org.apache.spark.mllib.clustering.KMeansModel = {
 
-      val kmeans = new KMeans()
-      var centers = getCentersFromMC(mcs).map(v => org.apache.spark.mllib.linalg.Vectors.dense(v.toArray))
-      val weights = getWeightsFromMC(mcs)
-      val map = (centers zip weights).toMap
-      val points = Array.fill(numPoints)(sample(map))
+    val kmeans = new KMeans()
+    var centers = getCentersFromMC(mcs).map(v => org.apache.spark.mllib.linalg.Vectors.dense(v.toArray))
+    val weights = getWeightsFromMC(mcs)
+    val map = (centers zip weights).toMap
+    val points = Array.fill(numPoints)(sample(map))
 
 
-      kmeans.setMaxIterations(20)
-      kmeans.setK(k)
-      kmeans.setInitialModel(new org.apache.spark.mllib.clustering.KMeansModel(Array.fill(k)(sample(map))))
-      val trainingSet = sc.parallelize(points)
-      val clusters = kmeans.run(trainingSet)
-      trainingSet.unpersist(blocking = false)
-      clusters
+    kmeans.setMaxIterations(20)
+    kmeans.setK(k)
+    kmeans.setInitialModel(new org.apache.spark.mllib.clustering.KMeansModel(Array.fill(k)(sample(map))))
+    val trainingSet = sc.parallelize(points)
+    val clusters = kmeans.run(trainingSet)
+    trainingSet.unpersist(blocking = false)
+    clusters
 
   }
 
   /**
     * Method that allows to run the online process from this class.
     *
-    * @param data: data that comes from the stream
+    * @param data : data that comes from the stream
     *
-    **/
+    * */
 
-  def startOnline(data: DStream[breeze.linalg.Vector[Double]]): Unit ={
+  def startOnline(data: DStream[breeze.linalg.Vector[Double]]): Unit = {
     model.run(data)
   }
 

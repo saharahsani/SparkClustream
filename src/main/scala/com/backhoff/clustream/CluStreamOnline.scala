@@ -261,15 +261,18 @@ class CluStreamOnline(
 
   def run(data: DStream[breeze.linalg.Vector[Double]]): Unit = {
     data.foreachRDD { (rdd, timeS) =>
+      //if(getCurrentTime==250) System.exit(0)
       currentN = rdd.count()
       if (currentN != 0) {
         if (initialized) {
           if (this.getCurrentTime + 1 > this.windowTime) {
             val time = this.getCurrentTime + 1 - this.windowTime
-          //  println(s"currentTime: ${this.getCurrentTime + 1}, windowTime: ${this.windowTime}, diffTime: ${time}}")
             // check if t<(tc-wt)
-            val lessThanCurrTime = time - 1
-            if (lessThanCurrTime > 0) removeOldData(rdd, lessThanCurrTime: Long)
+            val lessThanCurrTime = time-1
+            if (lessThanCurrTime > 0){
+            //  println(s"currentTime: ${this.getCurrentTime + 1}, windowTime: ${this.windowTime}, diffTime: ${time}}")
+            //  removeOldData(rdd, lessThanCurrTime: Long)
+            }
           }
           val assignations = assignToMicroCluster(rdd)
           updateMicroClusters(assignations)

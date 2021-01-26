@@ -33,7 +33,7 @@ object KafkaStreamingTest {
     val stream = KafkaUtils.createDirectStream[String, String, StringDecoder, StringDecoder](
       ssc, m, Set(topic))
 
-    val model = new CluStreamOnline(50, 34, 2000).setDelta(512).setM(20).setInitNormalKMeans(false)
+    val model = new CluStreamOnline(50, 54, 2000).setDelta(512).setM(20).setInitNormalKMeans(false)
     val clustream = new CluStream(model)
     ssc.addStreamingListener(new PrintClustersListener(clustream, sc))
     //clustream.startOnline(lines.map(_.split(" ").map(_.toDouble)).map(DenseVector(_)))
@@ -52,13 +52,13 @@ private[clustream] class PrintClustersListener(clustream: CluStream, sc: SparkCo
 
       val tc = clustream.model.getCurrentTime
       val n = clustream.model.getTotalPoints
-      val dir = "src/test/resources/snaps"
-      clustream.saveSnapShotsToDisk(dir, tc, 2, 10)
+      clustream.saveSnapShotsToDisk(Setting.snapsPath, tc, 2, 10)
       println("tc = " + tc + ", n = " + n)
       // expiring phase
-      clustream.expiringPhase(tc, 70, dir)
-      if (tc >= 178) {
-        OnlineCenters.getCenters(clustream, dir, tc)
+    //   val res= clustream.expiringPhase(tc, Setting.windowTime, Setting.snapsPath)
+
+      if (tc >=Setting.centersStartNum) {
+        OnlineCenters.getCenters(clustream, Setting.snapsPath, tc)
       }
 
       //      if (149900 < n && n <= 150100 ) {
