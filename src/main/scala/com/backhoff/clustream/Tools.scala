@@ -10,10 +10,10 @@ object Tools {
   }
     def convertMCsBinariesToText(dirIn: String = "", dirOut: String = "", limit: Int): Unit = {
       print("processing files: ")
-      for(i <- 0 to limit) {
+      for(i <- 31 to limit) {
         if(Files.exists(Paths.get(dirIn + "/" + i)))
         try {
-          val file = new ObjectInputStream(new FileInputStream(dirIn + "/" + i))
+          val file = new ObjectInputStream(new FileInputStream(dirIn + "/" + i+"SW"))
           val mc = file.readObject().asInstanceOf[Array[MicroCluster]]
           var text: Array[String] = null
           file.close()
@@ -28,7 +28,7 @@ object Tools {
                 "N = " + m.getN.toString + "\n"
             }
 
-            val pw = new PrintWriter(new File(dirOut + "/" + i))
+            val pw = new PrintWriter(new File(dirOut + "/" + i+"SW"))
             pw.write(text.mkString("","",""))
             pw.close
             print(i + " ")

@@ -48,6 +48,7 @@ object ProducerTest extends  App() {
   val fileName5="src/test/resources/ShuffleDataset.csv"
   val fileName6="src/test/resources/scaledCovtype.csv"
   val fileName7="src/test/resources/Covtype.csv"
+  val fileName8="src/test/resources/kdd_minus2.csv"
 
 
   try {

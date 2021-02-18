@@ -25,7 +25,7 @@ object StreamingTests {
     Logger.getLogger("akka").setLevel(Level.OFF)
     val ssc = new StreamingContext(sc, Milliseconds(1000))
     // ssc.checkpoint("/home/omar/stream/checkpoint")
-    val lines = ssc.socketTextStream("localhost", 9998)
+    val lines = ssc.socketTextStream("localhost", 9999)
     //    val lines = ssc.textFileStream("file:///home/omar/stream/train")
 
     //    val words = lines.flatMap(_.split(" ").map(_.toInt))
@@ -45,7 +45,8 @@ object StreamingTests {
     ssc.addStreamingListener(new PrintClustersListener(clustream, sc))
     //    model.run(lines.map(_.split(" ").map(_.toDouble)).map(DenseVector(_)))
     //    clustream.startOnline(lines.map(_.split(" ").map(_.toDouble)).map(arr => arr.dropRight(1)).map(DenseVector(_)))
-    clustream.startOnline(lines.map(_.split(" ").map(_.toDouble)).map(DenseVector(_)))
+    //lines.count().print()
+    clustream.startOnline(lines.map(_.split(",").map(_.toDouble)).map(DenseVector(_)))
 
     // wordCounts.print()
     ssc.start()
@@ -63,9 +64,12 @@ private[clustream] class PrintClustersListener(clustream: CluStream, sc: SparkCo
         val tc = clustream.model.getCurrentTime
         val n = clustream.model.getTotalPoints
 
-        clustream.saveSnapShotsToDisk("snaps",tc, 2, 10)
+        clustream.saveSnapShotsToDisk("src/test/resources/snaps",tc, 2, 10)
         println("tc = " + tc + ", n = " + n)
 
+        if (tc >=Setting.centersStartNum) {
+          OnlineCenters.getCenters(clustream, Setting.snapsPath, tc)
+        }
 //      if (149900 < n && n <= 150100 ) {
 //
 //        val snaps = clustream.getSnapShots("snaps",tc,256)
