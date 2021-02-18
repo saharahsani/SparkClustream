@@ -6,12 +6,13 @@ package com.backhoff.clustream
 
 import breeze.linalg._
 import org.apache.spark.broadcast.Broadcast
-import org.apache.spark.Logging
+import org.apache.spark.{Logging, SparkContext}
 import org.apache.spark.streaming.dstream.DStream
 import org.apache.spark.rdd.RDD
 import org.apache.spark.annotation.Experimental
 import org.apache.spark.mllib.clustering.{KMeans, StreamingKMeans}
 import breeze.stats.distributions.Gaussian
+import org.apache.spark.mllib.clustering
 
 import java.io.{FileInputStream, IOException, ObjectInputStream}
 import java.nio.file.{Files, Paths}
@@ -32,7 +33,7 @@ import scala.collection.mutable.ArrayBuffer
   * @param minInitPoints : minimum number of points to use for the initialization
   *                      of the microclusters. If set to 0 then initRand is used
   *                      insted of initKmeans
-  **/
+  * */
 
 @Experimental
 class CluStreamOnline(
@@ -44,7 +45,7 @@ class CluStreamOnline(
 
   /**
     * Easy timer function for blocks
-    **/
+    * */
 
   def timer[R](block: => R): R = {
     val t0 = System.nanoTime()
@@ -58,7 +59,7 @@ class CluStreamOnline(
   private var delta = 20
   private var tFactor = 2.0
   private var recursiveOutliersRMSDCheck = true
-
+  private var removeSW = false
   private var time: Long = 0L
   private var N: Long = 0L
   private var currentN: Long = 0L
@@ -76,14 +77,13 @@ class CluStreamOnline(
   private var strKmeans: StreamingKMeans = null
 
 
-
   private var initArr: Array[breeze.linalg.Vector[Double]] = Array()
 
   /**
     * Random initialization of the q microclusters
     *
     * @param rdd : rdd in use from the incoming DStream
-    **/
+    * */
 
   private def initRand(rdd: RDD[breeze.linalg.Vector[Double]]): Unit = {
     mcInfo = Array.fill(q)(new MicroClusterInfo(Vector.fill[Double](numDimensions)(rand()), 0.0, 0L)) zip (0 until q)
@@ -111,15 +111,19 @@ class CluStreamOnline(
     * Initialization of the q microclusters using the K-Means algorithm
     *
     * @param rdd : rdd in use from the incoming DStream
-    **/
+    * */
 
   private def initKmeans(rdd: RDD[breeze.linalg.Vector[Double]]): Unit = {
     initArr = initArr ++ rdd.collect
     if (initArr.length >= minInitPoints) {
       val tempRDD = rdd.context.parallelize(initArr)
       val trainingSet = tempRDD.map(v => org.apache.spark.mllib.linalg.Vectors.dense(v.toArray))
-      val clusters = KMeans.train(trainingSet, q, 10)
-
+      val kmeans = new KMeans();
+      kmeans.setMaxIterations(10)
+      kmeans.setK(q)
+      //  kmeans.setSeed(1)
+      val clusters = kmeans.run(trainingSet)
+      //   val clusters = KMeans.train(trainingSet, q, 10)
       mcInfo = Array.fill(q)(new MicroClusterInfo(Vector.fill[Double](numDimensions)(0), 0.0, 0L)) zip (0 until q)
       for (i <- clusters.clusterCenters.indices) mcInfo(i)._1.setCentroid(DenseVector(clusters.clusterCenters(i).toArray))
 
@@ -147,11 +151,11 @@ class CluStreamOnline(
 
   private def initStreamingKmeans(rdd: RDD[breeze.linalg.Vector[Double]]): Unit = {
 
-    if(strKmeans == null) strKmeans = new StreamingKMeans().setK(q).setRandomCenters(numDimensions, 0.0)
+    if (strKmeans == null) strKmeans = new StreamingKMeans().setK(q).setRandomCenters(numDimensions, 0.0)
     val trainingSet = rdd.map(v => org.apache.spark.mllib.linalg.Vectors.dense(v.toArray))
 
-    val clusters = strKmeans.latestModel().update(trainingSet,1.0, "batches")
-    if(currentN >= minInitPoints){
+    val clusters = strKmeans.latestModel().update(trainingSet, 1.0, "batches")
+    if (currentN >= minInitPoints) {
 
       mcInfo = Array.fill(q)(new MicroClusterInfo(Vector.fill[Double](numDimensions)(0), 0.0, 0L)) zip (0 until q)
       for (i <- clusters.clusterCenters.indices) mcInfo(i)._1.setCentroid(DenseVector(clusters.clusterCenters(i).toArray))
@@ -177,12 +181,13 @@ class CluStreamOnline(
     }
 
   }
+
   /**
-   * remove old data that expired their time of sliding window
-   * update microclusters and mcInfo
-   *
-   * @return
-   */
+    * remove old data that expired their time of sliding window
+    * update microclusters and mcInfo
+    *
+    * @return
+    */
   def removeOldData(rdd: RDD[Vector[Double]], time: Long) = {
     try {
       val dir = "src/test/resources/snaps"
@@ -191,6 +196,10 @@ class CluStreamOnline(
         val in = new ObjectInputStream(new FileInputStream(dir + "/" + time + "SW"))
         val snap2 = in.readObject().asInstanceOf[Array[MicroCluster]]
         in.close()
+
+        // microClusters befor change
+       // println("before change: " + snap1.map(x => x.getN).mkString(","))
+
         /* val arrs1 = snap1.map(_.getIds)
          val arrs2 = snap2.map(_.getIds)
          val relatingMCs = snap1 zip arrs1.map(a => arrs2.zipWithIndex.map(b => if (b._1.toSet.intersect(a.toSet).nonEmpty) b._2; else -1))
@@ -214,23 +223,21 @@ class CluStreamOnline(
         val mcs = snap1.map { mc =>
           for (mc2 <- snap2) {
             if (mc.getIds.intersect(mc2.getIds).nonEmpty) {
+           // println("intersect: "+ mc.getIds.intersect(mc2.getIds).map(x=>x).mkString(","))
               mc.setCf2x(mc.getCf2x :- mc2.getCf2x)
               mc.setCf1x(mc.getCf1x :- mc2.getCf1x)
               mc.setCf2t(mc.getCf2t - mc2.getCf2t)
               mc.setCf1t(mc.getCf1t - mc2.getCf1t)
               mc.setN(mc.getN - mc2.getN)
-
+          /*  val ss=  mc.ids.toSet.diff(mc2.ids.toSet)
+             println("diff ids: "+ss.map(x=>x).mkString(","))*/
             }
           }
           mc
         }
-
-
         this.microClusters = mcs
-        /*  if(time==1){
-            println(this.microClusters.map(x=>x.n).mkString(","))
-          }*/
-        //this.microClusters.foreach(x => print(x.n+","))
+        // microClusters after change
+       // println("after change: " + mcs.map(x => x.getN).mkString(","))
         var i = 0
         for (mc <- this.microClusters) {
           mcInfo(i) = (mcInfo(i)._1, mc.getIds(0))
@@ -244,6 +251,12 @@ class CluStreamOnline(
             mc._1.setRmsd(distanceNearestMC(mc._1.centroid, mcInfo))
         }
         broadcastMCInfo = rdd.context.broadcast(mcInfo)
+
+        //println("mcs ids: "+ snap1.map(x=>x.ids(0)).mkString(","))
+      //  println("file " + time + "SW ids: " + snap2.map(x => x.ids(0)).mkString(","))
+       // println("file " + time + "SW n: " + snap2.map(x => x.n).mkString(","))
+
+
       }
     }
     catch {
@@ -251,13 +264,41 @@ class CluStreamOnline(
         null
     }
   }
+
+  /**
+    * method that initialized clusters
+    *
+    * @param initPathFile
+    * @return
+    */
+  def initializeClusters(sc: SparkContext, initPathFile: String): Boolean = {
+    try {
+      if (Files.exists(Paths.get(initPathFile + 0))) {
+        val rddFile = sc.textFile(initPathFile)
+        val rddData = rddFile.map(x => x.split(",").map(_.toDouble)).map(Vector(_))
+        currentN = minInitPoints
+        minInitPoints match {
+          case 0 => initRand(rddData)
+          case _ => if (useNormalKMeans) initKmeans(rddData) else initStreamingKmeans(rddData)
+        }
+        this.time += 1
+        this.N += currentN
+        return true
+      }
+      return false
+    } catch {
+      case ex: IOException => println("Exception while reading files " + ex)
+        return false
+    }
+  }
+
   /**
     * Main method that runs the entire algorithm. This is called every time the
     * Streaming context handles a batch.
     *
     * @param data : data coming from the stream. Each entry has to be parsed as
     *             breeze.linalg.Vector[Double]
-    **/
+    * */
 
   def run(data: DStream[breeze.linalg.Vector[Double]]): Unit = {
     data.foreachRDD { (rdd, timeS) =>
@@ -265,13 +306,16 @@ class CluStreamOnline(
       currentN = rdd.count()
       if (currentN != 0) {
         if (initialized) {
-          if (this.getCurrentTime + 1 > this.windowTime) {
-            val time = this.getCurrentTime + 1 - this.windowTime
-            // check if t<(tc-wt)
-            val lessThanCurrTime = time-1
-            if (lessThanCurrTime > 0){
-            //  println(s"currentTime: ${this.getCurrentTime + 1}, windowTime: ${this.windowTime}, diffTime: ${time}}")
-            //  removeOldData(rdd, lessThanCurrTime: Long)
+          if (this.removeSW) {
+            val tc = this.getCurrentTime + 1
+            if (tc > this.windowTime) {
+              val time = tc - this.windowTime + 1
+              // check if time < ((tc-wt+1),tc)
+              val lessThanCurrTime = time - 1
+              if (lessThanCurrTime > 0) {
+                //  println(s"currentTime: ${this.getCurrentTime + 1}, windowTime: ${this.windowTime}, diffTime: ${time}}")
+                removeOldData(rdd, lessThanCurrTime: Long)
+              }
             }
           }
           val assignations = assignToMicroCluster(rdd)
@@ -294,8 +338,9 @@ class CluStreamOnline(
         } else {
           minInitPoints match {
             case 0 => initRand(rdd)
-            case _ => if(useNormalKMeans) initKmeans(rdd) else initStreamingKmeans(rdd)
+            case _ => if (useNormalKMeans) initKmeans(rdd) else initStreamingKmeans(rdd)
           }
+
         }
       }
       this.time += 1
@@ -307,19 +352,21 @@ class CluStreamOnline(
     * Method that returns the current array of microclusters.
     *
     * @return Array[MicroCluster]: current array of microclusters
-    **/
+    * */
 
   def getMicroClusters: Array[MicroCluster] = {
     this.microClusters
   }
+
   def getMicroClusterSW: Array[MicroCluster] = {
     this.microClusterSW.toArray
   }
+
   /**
     * Method that returns current time clock unit in the stream.
     *
     * @return Long: current time in stream
-    **/
+    * */
 
   def getCurrentTime: Long = {
     this.time
@@ -330,7 +377,7 @@ class CluStreamOnline(
     * the stream.
     *
     * @return Long: total number of points processed
-    **/
+    * */
 
   def getTotalPoints: Long = {
     this.N
@@ -345,7 +392,7 @@ class CluStreamOnline(
     *
     * @param ans : true or false
     * @return Class: current class
-    **/
+    * */
 
   def setRecursiveOutliersRMSDCheck(ans: Boolean): this.type = {
     this.recursiveOutliersRMSDCheck = ans
@@ -360,7 +407,7 @@ class CluStreamOnline(
     *
     * @param ans : true or false
     * @return Class: current class
-    **/
+    * */
 
   def setInitNormalKMeans(ans: Boolean): this.type = {
     this.useNormalKMeans = ans
@@ -374,7 +421,7 @@ class CluStreamOnline(
     *
     * @param m : m last points
     * @return Class: current class
-    **/
+    * */
 
   def setM(m: Int): this.type = {
     this.mLastPoints = m
@@ -387,10 +434,21 @@ class CluStreamOnline(
     *
     * @param d : threshold
     * @return Class: current class
-    **/
+    * */
 
   def setDelta(d: Int): this.type = {
     this.delta = d
+    this
+  }
+
+  /**
+    * for sliding window
+    *
+    * @param bool
+    * @return
+    */
+  def removeExpiredSW(bool: Boolean): this.type = {
+    this.removeSW = bool
     this
   }
 
@@ -401,7 +459,7 @@ class CluStreamOnline(
     *
     * @param t : t factor
     * @return Class: current class
-    **/
+    * */
 
   def setTFactor(t: Double): this.type = {
     this.tFactor = t
@@ -414,7 +472,7 @@ class CluStreamOnline(
     * @param vec : the point
     * @param mcs : Array of microcluster information
     * @return Double: the distance
-    **/
+    * */
 
   private def distanceNearestMC(vec: breeze.linalg.Vector[Double], mcs: Array[(MicroClusterInfo, Int)]): Double = {
 
@@ -434,7 +492,7 @@ class CluStreamOnline(
     * @param idx1 : local index of one microcluster in the array
     * @param idx2 : local index of another microcluster in the array
     * @return Double: the squared distance
-    **/
+    * */
 
   private def squaredDistTwoMCArrIdx(idx1: Int, idx2: Int): Double = {
     squaredDistance(microClusters(idx1).getCf1x :/ microClusters(idx1).getN.toDouble, microClusters(idx2).getCf1x :/ microClusters(idx2).getN.toDouble)
@@ -446,7 +504,7 @@ class CluStreamOnline(
     * @param idx1  : local index of the microcluster in the array
     * @param point : the point
     * @return Double: the squared distance
-    **/
+    * */
 
   private def squaredDistPointToMCArrIdx(idx1: Int, point: Vector[Double]): Double = {
     squaredDistance(microClusters(idx1).getCf1x :/ microClusters(idx1).getN.toDouble, point)
@@ -457,7 +515,7 @@ class CluStreamOnline(
     *
     * @param idx0 : ID of the microcluster
     * @return Int: local index of the microcluster
-    **/
+    * */
 
   private def getArrIdxMC(idx0: Int): Int = {
     var id = -1
@@ -475,7 +533,7 @@ class CluStreamOnline(
     * @param idx1 : local index of one microcluster in the array
     * @param idx2 : local index of one microcluster in the array
     *
-    **/
+    * */
 
   private def mergeMicroClusters(idx1: Int, idx2: Int): Unit = {
 
@@ -498,7 +556,7 @@ class CluStreamOnline(
     * @param idx1  : local index of the microcluster in the array
     * @param point : the point
     *
-    **/
+    * */
 
   private def addPointMicroClusters(idx1: Int, point: (Int, Vector[Double])): Unit = {
 
@@ -541,7 +599,7 @@ class CluStreamOnline(
     * @param idx   : local index of the microcluster in the array
     * @param point : the point
     *
-    **/
+    * */
 
   private def replaceMicroCluster(idx: Int, point: (Int, Vector[Double])): Unit = {
     microClusters(idx) = new MicroCluster(point._2 :* point._2, point._2, this.time * this.time, this.time, 1L)
@@ -563,7 +621,7 @@ class CluStreamOnline(
     * @return RDD[(Int, Vector[Double])]: RDD that contains a tuple of the ID of the
     *         nearest microcluster and the point itself.
     *
-    **/
+    * */
 
   private def assignToMicroCluster(rdd: RDD[Vector[Double]], mcInfo: Array[(MicroClusterInfo, Int)]): RDD[(Int, Vector[Double])] = {
     rdd.map { a =>
@@ -585,11 +643,11 @@ class CluStreamOnline(
   /**
     * Finds the nearest microcluster for all entries of an RDD, uses broadcast variable.
     *
-    * @param rdd    : RDD with points
+    * @param rdd : RDD with points
     * @return RDD[(Int, Vector[Double])]: RDD that contains a tuple of the ID of the
     *         nearest microcluster and the point itself.
     *
-    **/
+    * */
   private def assignToMicroCluster(rdd: RDD[Vector[Double]]) = {
     rdd.map { a =>
       var minDist = Double.PositiveInfinity
@@ -614,7 +672,7 @@ class CluStreamOnline(
     * @param assignations : RDD that contains a tuple of the ID of the
     *                     nearest microcluster and the point itself.
     *
-    **/
+    * */
 
   private def updateMicroClusters(assignations: RDD[(Int, Vector[Double])]): Unit = {
 
@@ -703,7 +761,7 @@ class CluStreamOnline(
           var minDist = Double.PositiveInfinity
           var idMinDist = 0
           if (recursiveOutliersRMSDCheck) for (id <- newMC) {
-            val dist = squaredDistPointToMCArrIdx(id,point._1._2)
+            val dist = squaredDistPointToMCArrIdx(id, point._1._2)
             if (dist < minDist) {
               minDist = dist
               idMinDist = id
@@ -750,7 +808,7 @@ class CluStreamOnline(
   * Object complementing the MicroCluster Class to allow it to create
   * new IDs whenever a new instance of it is created.
   *
-  **/
+  * */
 
 private object MicroCluster extends Serializable {
   private var current = -1
@@ -764,7 +822,7 @@ private object MicroCluster extends Serializable {
 /**
   * Packs the microcluster object and its features in one single class
   *
-  **/
+  * */
 
 protected class MicroCluster(
                               var cf2x: breeze.linalg.Vector[Double],
@@ -830,7 +888,7 @@ protected class MicroCluster(
   * Packs some microcluster information to reduce the amount of data to be
   * broadcasted.
   *
-  **/
+  * */
 
 private class MicroClusterInfo(
                                 var centroid: breeze.linalg.Vector[Double],

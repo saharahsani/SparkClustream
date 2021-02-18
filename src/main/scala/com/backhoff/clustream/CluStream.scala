@@ -5,6 +5,7 @@ package com.backhoff.clustream
   */
 
 import breeze.linalg._
+import com.sun.org.apache.xpath.internal.operations.Bool
 import org.apache.spark.{Logging, SparkContext}
 import org.apache.spark.streaming.dstream.DStream
 import org.apache.spark.annotation.Experimental
@@ -27,6 +28,7 @@ import scala.util.Try
 class CluStream(
                  val model: CluStreamOnline)
   extends Logging with Serializable {
+
 
   def this() = this(null)
 
@@ -91,7 +93,8 @@ class CluStream(
       try {
         out.writeObject(mcs)
         out1.writeObject(mcSW)
-        // println(mcs.map(x=>x.getN).mkString(","))
+       // println(mcs.map(x=>x.getN).mkString(","))
+       // println(mcSW.map(x=>x.getN).mkString(","))
 
       }
       catch {
@@ -232,7 +235,7 @@ class CluStream(
     * @param dir
     * */
   def expiringPhase(tc: Long, windowTime: Int, dir: String): Boolean = {
-    val threshold = tc - windowTime
+    val threshold = tc -windowTime+1
     val directory = new File(dir)
     try {
       if (directory.exists && directory.isDirectory && directory.listFiles().length > 0) {
@@ -282,6 +285,21 @@ class CluStream(
     clusters
 
   }
+
+  /**
+    * Method that allows to initialize the online clustering from this class
+    * @param initPathFile
+    * @return
+    */
+  def StartInitialize(snapPath: String,sc: SparkContext,initPathFile: String):Boolean = {
+    val bool=model.initializeClusters(sc,initPathFile)
+    if(bool) {
+      saveSnapShotsToDisk(snapPath, 1, 2, 10)
+      println("tc = " + 1 + ", n = " + model.minInitPoints)
+    }
+    return bool
+  }
+
 
   /**
     * Method that allows to run the online process from this class.

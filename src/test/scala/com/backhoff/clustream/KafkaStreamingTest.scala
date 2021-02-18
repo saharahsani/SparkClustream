@@ -33,17 +33,23 @@ object KafkaStreamingTest {
     val stream = KafkaUtils.createDirectStream[String, String, StringDecoder, StringDecoder](
       ssc, m, Set(topic))
 
-    val model = new CluStreamOnline(50, 54, 2000).setDelta(512).setM(20).setInitNormalKMeans(false)
+    val model = new CluStreamOnline(50, 54, 2000).removeExpiredSW(true).setDelta(512).setM(20).setInitNormalKMeans(false)
     val clustream = new CluStream(model)
     ssc.addStreamingListener(new PrintClustersListener(clustream, sc))
-    //clustream.startOnline(lines.map(_.split(" ").map(_.toDouble)).map(DenseVector(_)))
-    clustream.startOnline(stream.map(z => z._2.split(",").map(_.toDouble)).map(DenseVector(_)))
-
+   // if(!Setting.initialize) {
+    //  val bool = clustream.StartInitialize(Setting.snapsPath,sc: SparkContext, Setting.initPathFile)
+    //  if (bool) Setting.initialize = true
+  //  }
+   // if(Setting.initialize) {
+        clustream.startOnline(stream.map(z => z._2.split(",").map(_.toDouble)).map(DenseVector(_)))
+   // }
     ssc.start()
     ssc.awaitTermination()
   }
 
 }
+
+
 
 private[clustream] class PrintClustersListener(clustream: CluStream, sc: SparkContext) extends StreamingListener {
 
@@ -55,10 +61,15 @@ private[clustream] class PrintClustersListener(clustream: CluStream, sc: SparkCo
       clustream.saveSnapShotsToDisk(Setting.snapsPath, tc, 2, 10)
       println("tc = " + tc + ", n = " + n)
       // expiring phase
-    //   val res= clustream.expiringPhase(tc, Setting.windowTime, Setting.snapsPath)
-
+      if(Setting.expirePhase) {
+        val res = clustream.expiringPhase(tc, Setting.windowTime, Setting.snapsPath)
+      }
       if (tc >=Setting.centersStartNum) {
+       // online phase centers
         OnlineCenters.getCenters(clustream, Setting.snapsPath, tc)
+
+        // offline phase centers
+      // OfflineCenters.getOfflineCenters(sc,clustream,Setting.snapsPath,tc)
       }
 
       //      if (149900 < n && n <= 150100 ) {
@@ -96,3 +107,5 @@ private[clustream] class PrintClustersListener(clustream: CluStream, sc: SparkCo
     }
   }
 }
+
+
