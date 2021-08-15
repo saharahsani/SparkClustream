@@ -40,7 +40,7 @@ object ProducerTest extends  App() {
 
   var kafkaProducer = new KafkaProducer[String, String](properties)
   val fileName0 = "src/test/resources/ScaledKdd.txt"
-  val fileName = "src/test/resources/kddCup.txt"
+  val fileName = "src/test/resources/kddCup.csv"
   val fileName1 = "src/test/resources/kdd_MinMax_OnlyNumeric.txt"
   val fileName2 = "src/test/resources/minMaxExport.txt"
   val fileName3 = "src/test/resources/zScore_normalize.txt"
@@ -48,12 +48,12 @@ object ProducerTest extends  App() {
   val fileName5="src/test/resources/ShuffleDataset.csv"
   val fileName6="src/test/resources/scaledCovtype.csv"
   val fileName7="src/test/resources/Covtype.csv"
-  val fileName8="src/test/resources/kdd_minus2.csv"
-
+  val fileName8="src/test/resources/generatorRBF100.csv"
+  val fileName9="src/test/resources/RBF2.csv"
 
   try {
     var i = 0
-    for (line <- Source.fromFile(fileName7).getLines) {
+    for (line <- Source.fromFile(fileName4).getLines) {
       {
         i += 1
         val message = line + "\n"
@@ -66,6 +66,7 @@ object ProducerTest extends  App() {
 
     kafkaProducer.close()
     println("close my producer.")
+
   }
   catch {
     case e: Exception => e.printStackTrace()

@@ -22,8 +22,11 @@ public class Setting {
     static String initPathFile = "src/test/resources/initClusters/kdd/";
     static Boolean initialize=true;
     // for sliding window
-    static Integer windowTime = 70;
-    static String centersOnlinePath = "src/test/resources/centersCov2_sw";
-    static Integer centersStartNum = 1;
-    static Boolean expirePhase=true;
+    static Integer windowTime = 6;
+    static String centersOnlinePath = "src/test/resources/res/centersPowPureH6K10";
+    static String centersOfflinePath = "src/test/resources/result/fCentersPowPureH6K10";
+    static Integer centersStartNum = 4;
+    static Boolean expirePhase=false;
+    static Integer runNum=4;
+    static Integer numDimension =2;
 }
