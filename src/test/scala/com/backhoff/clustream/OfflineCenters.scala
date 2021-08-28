@@ -11,10 +11,10 @@ import scala.reflect.io.Path
 object OfflineCenters {
   def main(args: Array[String]): Unit = {
     var startNum =4
-    val loopEndNum = 30
+    val loopEndNum = 320
     val dir = Setting.snapsPath
     val h = Setting.windowTime
-    val k = 10
+    val k = 15
     val numPoint = 5000
 
     val conf = new SparkConf().setAppName("Simple Application").setMaster("local[*]")

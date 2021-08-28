@@ -22,7 +22,7 @@ object OnlineCenters {
   def getCenters(clustream:CluStream,snaps:String,tc:Long,h:Int): Unit = {
 
     val snapshot = clustream.getMCsFromSnapshots(snaps, tc, h)
-   // println("mics points = " + snapshot.map(_.getN).mkString(","))
+    println("mics points = " + snapshot.map(_.getN).mkString(","))
     val dirPath = Paths.get(s"${Setting.centersOnlinePath}")
     val directory = new File(dirPath.toString)
     if (!directory.exists()) {
