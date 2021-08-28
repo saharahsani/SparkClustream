@@ -14,6 +14,7 @@ import java.io._
 import java.nio.file.{Files, Paths}
 import org.apache.spark.mllib.clustering.KMeans
 
+import scala.collection.mutable.ListBuffer
 import scala.util.Try
 
 /**
@@ -88,11 +89,11 @@ class CluStream(
 
     if (write) {
       val out = new ObjectOutputStream(new FileOutputStream(dir + "/" + tc))
-      val out1 = new ObjectOutputStream((new FileOutputStream(dir + "/" + tc + "SW")))
+      //val out1 = new ObjectOutputStream((new FileOutputStream(dir + "/" + tc + "SW")))
 
       try {
         out.writeObject(mcs)
-        out1.writeObject(mcSW)
+       // out1.writeObject(mcSW)
        // println(mcs.map(x=>x.getN).mkString(","))
        // println(mcSW.map(x=>x.getN).mkString(","))
 
@@ -102,7 +103,7 @@ class CluStream(
       }
       finally {
         out.close()
-        out1.close()
+       // out1.close()
 
       }
     }
@@ -274,7 +275,7 @@ class CluStream(
     val weights = getWeightsFromMC(mcs)
     val map = (centers zip weights).toMap
     val points = Array.fill(numPoints)(sample(map))
-
+    var arr: Array[Double] = mcs.map(_.getN.toDouble).filter(_ > 0)
 
     kmeans.setMaxIterations(20)
     kmeans.setK(k)
@@ -307,7 +308,7 @@ class CluStream(
     * @param data : data that comes from the stream
     *
     * */
-
+  //data: DStream[breeze.linalg.Vector[Double]]
   def startOnline(data: DStream[breeze.linalg.Vector[Double]]): Unit = {
     model.run(data)
   }
