@@ -14,7 +14,7 @@ import java.time.{Duration, Instant}
 object KafkaStreamingTest {
   def main(args: Array[String]): Unit = {
     val conf = new SparkConf().setAppName("Spark CluStream").setMaster("local[*]")
-      .set("spark.streaming.kafka.maxRatePerPartition", "1000")
+      .set("spark.streaming.kafka.maxRatePerPartition", "2000")
       .set("spark.ui.enabled", "True")
       .set("spark.ui.port", "4040")
     val sc = new SparkContext(conf)
@@ -37,7 +37,7 @@ object KafkaStreamingTest {
     val stream = KafkaUtils.createDirectStream[String, String, StringDecoder, StringDecoder](
       ssc, m, Set(topic))
 
-    val model = new CluStreamOnline(100, Setting.numDimension, 2000).removeExpiredSW(Setting.expirePhase).setDelta(512).setM(20).setInitNormalKMeans(true)
+    val model = new CluStreamOnline(50, Setting.numDimension, 2000).removeExpiredSW(Setting.expirePhase).setDelta(512).setM(20).setInitNormalKMeans(true)
     val clustream = new CluStream(model)
     ssc.addStreamingListener(new PrintClustersListener(clustream, sc))
    // if(!Setting.initialize) {
@@ -76,8 +76,8 @@ private[clustream] class PrintClustersListener(clustream: CluStream, sc: SparkCo
       }*/
       if (tc >=Setting.centersStartNum) {
        // online phase centers
-        OnlineCenters.getCenters(clustream, Setting.snapsPath, tc)
-      //  OnlineCenters.getCenters(clustream, Setting.snapsPath, tc,Setting.h)
+       // OnlineCenters.getCenters(clustream, Setting.snapsPath, tc)
+        OnlineCenters.getCenters(clustream, Setting.snapsPath, tc,Setting.h)
 
         // offline phase centers
       // OfflineCenters.getOfflineCenters(sc,clustream,Setting.snapsPath,tc)
