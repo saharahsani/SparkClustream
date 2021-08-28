@@ -1,3 +1,4 @@
+
 package com.backhoff.clustream
 
 /**
@@ -13,9 +14,12 @@ import org.apache.spark.annotation.Experimental
 import org.apache.spark.mllib.clustering.{KMeans, StreamingKMeans}
 import breeze.stats.distributions.Gaussian
 import org.apache.spark.mllib.clustering
+import org.apache.spark.mllib.feature.StandardScaler
+import org.apache.spark.mllib.linalg.Vectors
 
 import java.io.{FileInputStream, IOException, ObjectInputStream}
 import java.nio.file.{Files, Paths}
+import java.time.{Duration, Instant}
 import scala.collection.mutable.ArrayBuffer
 
 
@@ -41,6 +45,7 @@ class CluStreamOnline(
                        val numDimensions: Int,
                        val minInitPoints: Int)
   extends Logging with Serializable {
+  var duration:Long=0L
 
 
   /**
@@ -51,7 +56,9 @@ class CluStreamOnline(
     val t0 = System.nanoTime()
     val result = block // call-by-name
     val t1 = System.nanoTime()
-    logInfo(s"Elapsed time: " + (t1 - t0) / 1000000 + "ms")
+   // duration =duration + ((t1 - t0) / 1000000)
+    //logInfo("Elapsed time: "+ duration)
+  //  logInfo(s"Elapsed time: " + (t1 - t0) / 1000000 + "ms")
     result
   }
 
@@ -70,7 +77,7 @@ class CluStreamOnline(
 
   private var broadcastQ: Broadcast[Int] = null
   private var broadcastMCInfo: Broadcast[Array[(MicroClusterInfo, Int)]] = null
-
+  var durationStep:Long=0L
   var initialized = false
 
   private var useNormalKMeans = false
@@ -305,8 +312,16 @@ class CluStreamOnline(
       //if(getCurrentTime==250) System.exit(0)
       currentN = rdd.count()
       if (currentN != 0) {
+        this.time += 1
+        this.N += currentN
+        val t0=Instant.now
+        val scaler2 = new StandardScaler(withMean = true, withStd = true).fit(rdd.map(x =>Vectors.dense(x.toArray)))
+        // data2 will be unit variance and zero mean.
+       val data_std = rdd.map(x => scaler2.transform(Vectors.dense(x.toArray)))
+       val tt= data_std.map(x=> x.toArray).map(DenseVector(_).toVector)
+
         if (initialized) {
-          if (this.removeSW) {
+         /* if (this.removeSW) {
             val tc = this.getCurrentTime + 1
             if (tc > this.windowTime) {
               val time = tc - this.windowTime + 1
@@ -314,11 +329,12 @@ class CluStreamOnline(
               val lessThanCurrTime = time - 1
               if (lessThanCurrTime > 0) {
                 //  println(s"currentTime: ${this.getCurrentTime + 1}, windowTime: ${this.windowTime}, diffTime: ${time}}")
-                removeOldData(rdd, lessThanCurrTime: Long)
+                removeOldData(tt, lessThanCurrTime: Long)
               }
             }
-          }
-          val assignations = assignToMicroCluster(rdd)
+          }*/
+
+          val assignations = assignToMicroCluster(tt)
           updateMicroClusters(assignations)
 
           var i = 0
@@ -333,18 +349,27 @@ class CluStreamOnline(
             if (mc._1.n == 1)
               mc._1.setRmsd(distanceNearestMC(mc._1.centroid, mcInfo))
           }
-
           broadcastMCInfo = rdd.context.broadcast(mcInfo)
-        } else {
-          minInitPoints match {
-            case 0 => initRand(rdd)
-            case _ => if (useNormalKMeans) initKmeans(rdd) else initStreamingKmeans(rdd)
-          }
+          val t1=Instant.now()
 
+         /* durationStep += Duration.between(t0, t1).toMillis
+          if(this.time==5 | this.time==10 | this.time==20 | this.time==40 | this.time==80 |  this.time==120 |  this.time == 100 | this.time==160 |  this.time==195){
+            println(s"execution time${this.time}: ${durationStep} ms")
+
+          }*/
+
+
+        } else {
+          val t00=Instant.now
+          minInitPoints match {
+            case 0 => initRand(tt)
+            case _ => if (useNormalKMeans) initKmeans(tt) else initStreamingKmeans(tt)
+          }
+           val t11=Instant.now
+          println("init time: "+Duration.between(t00, t11).toMillis+ " ms")
         }
       }
-      this.time += 1
-      this.N += currentN
+
     }
   }
 
@@ -699,7 +724,7 @@ class CluStreamOnline(
     } else dataIn = assignations
 
     // Compute sums, sums of squares and count points... all by key
-    logInfo(s"Processing points")
+   // logInfo(s"Processing points")
 
     // sumsAndSumsSquares -> (key: Int, (sum: Vector[Double], sumSquares: Vector[Double], count: Long ) )
     val sumsAndSumsSquares = timer {
@@ -907,4 +932,5 @@ private class MicroClusterInfo(
     this.n = n
   }
 }
+
 
