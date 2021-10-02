@@ -1,4 +1,4 @@
-name := "SparkClu-V1"
+name := "SparkClustream"
 
 version := "0.1"
 
