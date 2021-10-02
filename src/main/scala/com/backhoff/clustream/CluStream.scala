@@ -94,7 +94,7 @@ class CluStream(
       try {
         out.writeObject(mcs)
        // out1.writeObject(mcSW)
-       // println(mcs.map(x=>x.getN).mkString(","))
+        println(mcs.map(x=>x.getN).mkString(","))
        // println(mcSW.map(x=>x.getN).mkString(","))
 
       }

@@ -352,11 +352,11 @@ class CluStreamOnline(
           broadcastMCInfo = rdd.context.broadcast(mcInfo)
           val t1=Instant.now()
 
-         /* durationStep += Duration.between(t0, t1).toMillis
-          if(this.time==5 | this.time==10 | this.time==20 | this.time==40 | this.time==80 |  this.time==120 |  this.time == 100 | this.time==160 |  this.time==195){
+          durationStep += Duration.between(t0, t1).toMillis
+          if(this.time==5 | this.time==10 | this.time==20 | this.time==40 | this.time==80 |  this.time==120 |  this.time == 100 | this.time==150 |  this.time==200){
             println(s"execution time${this.time}: ${durationStep} ms")
 
-          }*/
+          }
 
 
         } else {
