@@ -50,10 +50,10 @@ object ProducerTest extends  App() {
   val fileName7="src/test/resources/Covtype.csv"
   val fileName8="src/test/resources/generatorRBF100.csv"
   val fileName9="src/test/resources/RBF2.csv"
-
+  val fileName14="src/test/resources/RBF100.csv"
   try {
     var i = 0
-    for (line <- Source.fromFile(fileName4).getLines) {
+    for (line <- Source.fromFile(fileName9).getLines) {
       {
         i += 1
         val message = line + "\n"
